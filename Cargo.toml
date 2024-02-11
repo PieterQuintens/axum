@@ -1,0 +1,22 @@
+[package]
+name = "axum_auth"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+tokio = { version = "1.36.0", features = ["full"] }
+# Axum
+axum = "0.7.4"
+axum-server = "0.6.0"
+tower-cookies = "0.10.0"
+tower-http = { version = "0.5.1", features = ["cors", "fs"] }
+
+# Serde / JSON
+serde = { version = "1.0.196", features = ["derive"] }
+serde_json = "1.0.113"
+
+[dev-dependencies]
+httpc-test = "0.1.9"
+anyhow = "1.0.79"
