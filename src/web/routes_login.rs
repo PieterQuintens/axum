@@ -1,6 +1,7 @@
 use crate::error::{Error, Result};
 use crate::web;
 use axum::{routing::post, Json, Router};
+use serde::Deserialize;
 use serde_json::{json, Value};
 use tower_cookies::{Cookie, Cookies};
 
@@ -26,12 +27,10 @@ async fn api_login(cookies: Cookies, payload: Json<LoginPayload>) -> Result<Json
         }
     }));
 
-    // todo!();
-
     Ok(body)
 }
 
-#[derive(Debug, serde::Deserialize)]
+#[derive(Debug, Deserialize)]
 struct LoginPayload {
     username: String,
     password: String,

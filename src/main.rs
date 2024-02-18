@@ -1,11 +1,14 @@
-use auth::LoginParams;
 use axum::{
-    extract::{Path, Query},
+    http::{Method, Uri},
     middleware,
-    response::{Html, IntoResponse, Response},
-    routing::{get, get_service},
-    Router,
+    response::{IntoResponse, Response},
+    routing::get_service,
+    Json, Router,
 };
+use ctx::Ctx;
+use serde_json::json;
+use uuid::Uuid;
+
 use std::net::SocketAddr;
 use tower_cookies::CookieManagerLayer;
 use tower_http::{
@@ -13,22 +16,34 @@ use tower_http::{
     services::ServeDir,
 };
 
-pub use self::error::{Error, Result};
+use crate::{error::Error, log::log_request, model::ModelController};
 
-mod auth;
+pub use self::error::Result;
+
+mod ctx;
 mod error;
+mod log;
+mod model;
 mod web;
 
 // run: cargo watch -q -c -w src/ -x run
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<()> {
+    // async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cors = CorsLayer::new().allow_origin(Any);
+    let mc = ModelController::new().await?;
+
+    let routes_apis = web::routes_tickets::routes(mc.clone())
+        .route_layer(middleware::from_fn(web::mw_auth::mw_require_auth));
 
     let app = Router::new()
-        .merge(routes_hello())
-        .merge(routes_auth())
         .merge(web::routes_login::routes())
+        .nest("/api", routes_apis)
         .layer(middleware::map_response(main_response_mapper))
+        .layer(middleware::from_fn_with_state(
+            mc.clone(),
+            web::mw_auth::mw_ctx_resolver,
+        ))
         .layer(CookieManagerLayer::new())
         .fallback_service(routes_static())
         .layer(cors);
@@ -39,42 +54,44 @@ async fn main() {
         .serve(app.into_make_service())
         .await
         .unwrap();
+
+    Ok(())
 }
 
-async fn main_response_mapper(res: Response) -> Response {
+async fn main_response_mapper(
+    ctx: Option<Ctx>,
+    uri: Uri,
+    req_method: Method,
+    res: Response,
+) -> Response {
     println!("--> {:<12} - main_response_mapper", "RES_MAPPER");
+    let uuid = Uuid::new_v4();
 
-    res
+    let service_error = res.extensions().get::<Error>();
+    let client_status_error = service_error.map(|e| e.client_status_and_error());
+
+    // -- If client error build the new response.
+    let error_response = client_status_error
+        .as_ref()
+        .map(|(status_code, client_error)| {
+            let client_error_body = json!({
+                "error":{
+                    "type":client_error.as_ref(),
+                    "req_uuid": uuid.to_string(),
+                },
+            });
+
+            println!(" ->> client_error_body: {client_error_body}");
+
+            (*status_code, Json(client_error_body)).into_response()
+        });
+
+    let client_error = client_status_error.unzip().1;
+    let _ = log_request(uuid, req_method, uri, ctx, service_error, client_error).await;
+
+    error_response.unwrap_or(res)
 }
 
 fn routes_static() -> Router {
     Router::new().nest_service("/", get_service(ServeDir::new("./")))
-}
-
-fn routes_hello() -> Router {
-    Router::new()
-        .route("/query", get(into_query_params))
-        .route("/path/:name", get(into_path))
-}
-
-fn routes_auth() -> Router {
-    Router::new()
-        .route("/login", get(into_query_params))
-        .route("/register/:name", get(into_path))
-}
-
-async fn into_query_params(Query(params): Query<LoginParams>) -> impl IntoResponse {
-    println!("Current params: {:?}", params);
-
-    let name: String = params.username.as_deref().unwrap_or("Mom").to_string();
-
-    Html(format!("<h1>Hello, {}!</h1>", name))
-}
-
-async fn into_path(Path(name): Path<String>) -> impl IntoResponse {
-    println!("Current params: {:?}", name);
-
-    // let name: String = path
-
-    Html(format!("<h1>Hello, {}!</h1>", name))
 }

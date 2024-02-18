@@ -5,10 +5,24 @@ edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[[bin]]
+name = "main"
+path = "src/main.rs"
+
+# Protobuf server implementation (seperate binary)
+[[bin]]
+name = "payments-server"
+path = "src/protobuf/server.rs"
+
+# Protobuf client implementation (seperate binary)
+[[bin]]
+name = "payments-client"
+path = "src/protobuf/client.rs"
+
 [dependencies]
-tokio = { version = "1.36.0", features = ["full"] }
+tokio = { version = "1.36.0", features = ["full", "macros"] }
 # Axum
-axum = "0.7.4"
+axum = { version = "0.7.4", features = ["macros"] }
 axum-server = "0.6.0"
 tower-cookies = "0.10.0"
 tower-http = { version = "0.5.1", features = ["cors", "fs"] }
@@ -16,7 +30,22 @@ tower-http = { version = "0.5.1", features = ["cors", "fs"] }
 # Serde / JSON
 serde = { version = "1.0.196", features = ["derive"] }
 serde_json = "1.0.113"
+serde_with = "3.6.1"
+
+# Others
+lazy-regex = "3.1"
+async-trait = "0.1.51"
+strum_macros = "0.26.1"
+uuid = { version = "1.7.0", features = ["v4", "fast-rng"] }
+chrono = "0.4.19"
+
+# gRPC
+tonic = "0.11.0"
+prost = "0.12.3"
 
 [dev-dependencies]
 httpc-test = "0.1.9"
 anyhow = "1.0.79"
+
+[build-dependencies]
+tonic-build = "0.11.0"

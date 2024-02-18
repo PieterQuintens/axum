@@ -1,6 +1,7 @@
 use anyhow::Result;
 use serde_json::json;
 
+// Because Windows, we need to run the tests like this...
 // run: cargo watch -c -w tests/ -x "test --target-dir=target/test"
 #[tokio::test]
 async fn quick_dev() -> Result<()> {
@@ -8,18 +9,15 @@ async fn quick_dev() -> Result<()> {
 
     hc.do_get("/path/test").await?.print().await?;
 
-    let req_login = hc.do_post(
-        "/api/login",
+    let req_create_tickets = hc.do_post(
+        "/api/tickets",
         json!({
-          "username":"pieter",
-          "password":"dsscsev"
+          "title": "Test ticket"
         }),
     );
+    req_create_tickets.await?.print().await?;
 
-    let res = req_login.await?;
-    let body = res.text_body()?;
-
-    println!("--> {:<12} - {:?}", "TEST", body);
+    hc.do_get("/api/tickets").await?.print().await?;
 
     Ok(())
 }
